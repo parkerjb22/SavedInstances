@@ -42,6 +42,8 @@ ALREADY_LOOTED = ALREADY_LOOTED:gsub("（.*）", "") -- fix on zhCN and zhTW
 local currency = SI.currency
 local QuestExceptions = SI.QuestExceptions
 local TimewalkingItemQuest = SI.TimewalkingItemQuest
+local C_ChallengeMode_GetDungeonScoreRarityColor = C_ChallengeMode.GetDungeonScoreRarityColor
+local colorCache = {}
 
 local Config = SI:GetModule("Config")
 local Tooltip = SI:GetModule("Tooltip")
@@ -1307,6 +1309,16 @@ function SI:UpdateToonData()
     end
   end
 
+  local function getLevelColor(level)
+    if colorCache[level] then
+      return colorCache[level]
+    end
+
+    local color = C_ChallengeMode_GetDungeonScoreRarityColor(level)
+    colorCache[level] = color and color:GenerateHexColor() or 'ffffffff'
+    return colorCache[level]
+  end
+
   local nextreset = SI:GetNextDailyResetTime()
   for instance, i in pairs(SI.db.Instances) do
     for toon, t in pairs(SI.db.Toons) do
@@ -1534,6 +1546,7 @@ function SI:UpdateToonData()
   t.Level = UnitLevel("player")
   local lrace, race = UnitRace("player")
   local faction, lfaction = UnitFactionGroup("player")
+  local color
   t.Faction = faction
   t.oRace = race
   if race == "Pandaren" then
@@ -1554,6 +1567,7 @@ function SI:UpdateToonData()
     t.Warmode = C_PvP.IsWarModeDesired()
     t.Covenant = C_Covenants.GetActiveCovenantID()
     t.MythicPlusScore = C_ChallengeMode.GetOverallDungeonScore()
+    t.DungeonScoreRarityColor = getLevelColor(t.MythicPlusScore)
   end
 
   t.LastSeen = time()
@@ -4018,6 +4032,36 @@ function SI:ShowTooltip(anchorframe)
         end
         tooltip:SetCell(show, col, "|c" .. t.TimewornMythicKey.color .. name .. " (" .. t.TimewornMythicKey.level .. ")" .. FONTEND, "CENTER", maxcol)
         tooltip:SetCellScript(show, col, "OnMouseDown", ChatLink, t.TimewornMythicKey.link)
+      end
+    end
+  end
+
+  if SI.db.Tooltip.MythicKeyBest or showall then
+    if SI.db.Tooltip.CategorySpaces and not (SI.db.Tooltip.MythicKey or SI.db.Tooltip.TimewornMythicKey or showall) then
+      addsep()
+    end
+    show = tooltip:AddLine(YELLOWFONT .. L["Item Level"] .. FONTEND)
+    for toon, t in cpairs(SI.db.Toons, true) do
+      local col = columns[toon..1]
+      if col ~= nil then
+        tooltip:SetCell(show, col, ("%d "):format(t.IL or 0), "CENTER", maxcol)
+      end
+    end
+  end
+
+  if SI.db.Tooltip.MythicKeyBest or showall then
+    if SI.db.Tooltip.CategorySpaces and not (SI.db.Tooltip.MythicKey or SI.db.Tooltip.TimewornMythicKey or showall) then
+      addsep()
+    end
+    show = tooltip:AddLine(YELLOWFONT .. L["Dungeon Score"] .. FONTEND)
+    for toon, t in cpairs(SI.db.Toons, true) do
+      local col = columns[toon..1]
+      if col ~= nil then
+        if t.DungeonScoreRarityColor then
+          tooltip:SetCell(show, col, "|c" .. t.DungeonScoreRarityColor .. t.MythicPlusScore .. FONTEND, "CENTER", maxcol)
+        else
+          tooltip:SetCell(show, col, t.MythicPlusScore, "CENTER", maxcol)
+        end
       end
     end
   end
